@@ -1,30 +1,30 @@
 import React, { useState, useEffect } from "react";
-import { Box, Typography, IconButton, Button } from "@mui/material";
-import { FaGithub, FaLinkedin, FaTwitter, FaInstagram } from "react-icons/fa";
-import { useLocation, useNavigate } from "react-router-dom"; // Import useNavigate
-import { supabase } from "./supabaseClient"; // Import Supabase client
+import { Box, Typography, IconButton, Button, Container, Grid } from "@mui/material";
+import { FaGithub, FaLinkedin, FaTwitter, FaInstagram, FaWallet } from "react-icons/fa";
+import { useLocation, useNavigate } from "react-router-dom";
+import { supabase } from "./supabaseClient";
 import { keyframes } from "@mui/system";
 
-const pulse = keyframes`
-  0% { transform: scale(1); }
-  50% { transform: scale(1.05); }
-  100% { transform: scale(1); }
-`;
-
-const fadeSlideIn = keyframes`
-  0% { opacity: 0; transform: translateY(20px); }
-  100% { opacity: 1; transform: translateY(0); }
+const socialPulse = keyframes`
+  0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(255,255,255,0.4); }
+  70% { transform: scale(1.05); box-shadow: 0 0 0 15px rgba(255,255,255,0); }
+  100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(255,255,255,0); }
 `;
 
 const Socials = () => {
   const { state } = useLocation();
   const [name, setName] = useState("");
-  const [githubConnected, setGithubConnected] = useState(false);
+  const [connectedAccounts, setConnectedAccounts] = useState({
+    github: false,
+    linkedin: false,
+    twitter: false,
+    instagram: false,
+    metamask: false
+  });
   const [account, setAccount] = useState(null);
-  const [isMetaMaskConnected, setIsMetaMaskConnected] = useState(false);
-  const email = state?.email; // Safely get the email
+  const email = state?.email;
 
-  const navigate = useNavigate(); // Initialize useNavigate
+  const navigate = useNavigate();
 
   useEffect(() => {
     const fetchName = async () => {
@@ -38,23 +38,67 @@ const Socials = () => {
           .from("answers")
           .select("answer")
           .eq("email", email)
-          .eq("question_number", 2); // Fetching the name from the second question
+          .eq("question_number", 2);
 
         if (error) throw error;
 
         if (data.length > 0) {
-          const userName = data[0].answer; // Get the name answer
-          setName(userName || ""); // Default to an empty string if no name
+          const userName = data[0].answer;
+          setName(userName || "");
         }
       } catch (error) {
         console.error("Error fetching name: ", error);
       }
     };
 
+    const checkExistingConnections = async () => {
+      if (!email) return;
+
+      try {
+        // Check GitHub connection
+        const { data: githubData } = await supabase
+          .from("github_accounts")
+          .select("*")
+          .eq("email", email)
+          .single();
+
+        // Check LinkedIn connection
+        const { data: linkedinData } = await supabase
+          .from("linkedin_accounts")
+          .select("*")
+          .eq("email", email)
+          .single();
+
+        // Check Twitter connection
+        const { data: twitterData } = await supabase
+          .from("twitter_accounts")
+          .select("*")
+          .eq("email", email)
+          .single();
+
+        // Check Instagram connection
+        const { data: instagramData } = await supabase
+          .from("instagram_accounts")
+          .select("*")
+          .eq("email", email)
+          .single();
+
+        setConnectedAccounts({
+          github: !!githubData,
+          linkedin: !!linkedinData,
+          twitter: !!twitterData,
+          instagram: !!instagramData,
+          metamask: false // This will be updated separately
+        });
+      } catch (error) {
+        console.error("Error checking existing connections:", error);
+      }
+    };
+
     fetchName();
+    checkExistingConnections();
   }, [email]);
 
-  // MetaMask Connection Check
   const checkMetaMask = async () => {
     if (typeof window.ethereum !== "undefined") {
       try {
@@ -62,64 +106,190 @@ const Socials = () => {
           method: "eth_requestAccounts",
         });
         setAccount(accounts[0]);
-        setIsMetaMaskConnected(true);
+        setConnectedAccounts(prev => ({ ...prev, metamask: true }));
       } catch (error) {
         console.error("Error connecting to MetaMask:", error);
       }
     } else {
-      console.error("MetaMask is not installed!");
       alert("Please install MetaMask to use this feature.");
     }
   };
 
-  // Handle MetaMask account changes
   useEffect(() => {
     if (typeof window.ethereum !== "undefined") {
       window.ethereum.on("accountsChanged", (accounts) => {
         if (accounts.length > 0) {
           setAccount(accounts[0]);
-          setIsMetaMaskConnected(true);
+          setConnectedAccounts(prev => ({ ...prev, metamask: true }));
         } else {
           setAccount(null);
-          setIsMetaMaskConnected(false);
+          setConnectedAccounts(prev => ({ ...prev, metamask: false }));
         }
       });
     }
   }, []);
 
-  const handleGithubConnect = async () => {
-    const { user, session, error } = await supabase.auth.signInWithOAuth({
-      provider: "github",
-    });
+  const handleSocialConnect = async (provider) => {
+    const providerMap = {
+      github: async () => {
+        const { user, session, error } = await supabase.auth.signInWithOAuth({
+          provider: "github",
+        });
 
-    if (error) {
-      console.error("GitHub login error:", error);
-      return;
-    }
+        if (error) {
+          console.error("GitHub login error:", error);
+          return false;
+        }
 
-    if (session && user) {
-      try {
-        const { data, error: saveError } = await supabase
-          .from("github_accounts")
-          .upsert({
-            email: email,
-            github_id: user.user_metadata.user_id,
-            github_username: user.user_metadata.user_name,
-            github_avatar: user.user_metadata.avatar_url,
-          });
+        if (session && user) {
+          try {
+            await supabase
+              .from("github_accounts")
+              .upsert({
+                email: email,
+                github_id: user.user_metadata.user_id,
+                github_username: user.user_metadata.user_name,
+                github_avatar: user.user_metadata.avatar_url,
+              });
 
-        if (saveError) throw saveError;
+            return true;
+          } catch (error) {
+            console.error("Error saving GitHub data:", error);
+            return false;
+          }
+        }
+        return false;
+      },
+      linkedin: async () => {
+        const { user, session, error } = await supabase.auth.signInWithOAuth({
+          provider: "linkedin",
+        });
 
-        setGithubConnected(true);
-      } catch (error) {
-        console.error("Error saving GitHub data:", error);
+        if (error) {
+          console.error("LinkedIn login error:", error);
+          return false;
+        }
+
+        if (session && user) {
+          try {
+            await supabase
+              .from("linkedin_accounts")
+              .upsert({
+                email: email,
+                linkedin_id: user.user_metadata.user_id,
+                linkedin_username: user.user_metadata.user_name,
+                linkedin_avatar: user.user_metadata.avatar_url,
+              });
+
+            return true;
+          } catch (error) {
+            console.error("Error saving LinkedIn data:", error);
+            return false;
+          }
+        }
+        return false;
+      },
+      twitter: async () => {
+        const { user, session, error } = await supabase.auth.signInWithOAuth({
+          provider: "twitter",
+        });
+
+        if (error) {
+          console.error("Twitter login error:", error);
+          return false;
+        }
+
+        if (session && user) {
+          try {
+            await supabase
+              .from("twitter_accounts")
+              .upsert({
+                email: email,
+                twitter_id: user.user_metadata.user_id,
+                twitter_username: user.user_metadata.user_name,
+                twitter_avatar: user.user_metadata.avatar_url,
+              });
+
+            return true;
+          } catch (error) {
+            console.error("Error saving Twitter data:", error);
+            return false;
+          }
+        }
+        return false;
+      },
+      instagram: async () => {
+        const { user, session, error } = await supabase.auth.signInWithOAuth({
+          provider: "instagram",
+        });
+
+        if (error) {
+          console.error("Instagram login error:", error);
+          return false;
+        }
+
+        if (session && user) {
+          try {
+            await supabase
+              .from("instagram_accounts")
+              .upsert({
+                email: email,
+                instagram_id: user.user_metadata.user_id,
+                instagram_username: user.user_metadata.user_name,
+                instagram_avatar: user.user_metadata.avatar_url,
+              });
+
+            return true;
+          } catch (error) {
+            console.error("Error saving Instagram data:", error);
+            return false;
+          }
+        }
+        return false;
+      }
+    };
+
+    const connectFunction = providerMap[provider];
+    if (connectFunction) {
+      const success = await connectFunction();
+      if (success) {
+        setConnectedAccounts(prev => ({ ...prev, [provider]: true }));
       }
     }
   };
 
-  const handleSkip = () => {
-    navigate("/profile", { state: { email } });
-  };
+  const allConnected = Object.values(connectedAccounts).every(v => v === true);
+
+  const socialButtons = [
+    { 
+      provider: 'github',
+      icon: FaGithub, 
+      color: connectedAccounts.github ? "#4CAF50" : "#ffffff", 
+      connected: connectedAccounts.github, 
+      onClick: () => handleSocialConnect('github') 
+    },
+    { 
+      provider: 'linkedin',
+      icon: FaLinkedin, 
+      color: connectedAccounts.linkedin ? "#0077B5" : "#ffffff", 
+      connected: connectedAccounts.linkedin, 
+      onClick: () => handleSocialConnect('linkedin') 
+    },
+    { 
+      provider: 'twitter',
+      icon: FaTwitter, 
+      color: connectedAccounts.twitter ? "#1DA1F2" : "#ffffff", 
+      connected: connectedAccounts.twitter, 
+      onClick: () => handleSocialConnect('twitter') 
+    },
+    { 
+      provider: 'instagram',
+      icon: FaInstagram, 
+      color: connectedAccounts.instagram ? "#E1306C" : "#ffffff", 
+      connected: connectedAccounts.instagram, 
+      onClick: () => handleSocialConnect('instagram') 
+    },
+  ];
 
   return (
     <Box
@@ -139,7 +309,7 @@ const Socials = () => {
         loop
         muted
         playsInline
-        src="./socials.mp4" // Replace with your video URL
+        src="./socials.mp4"
         style={{
           position: "absolute",
           top: 0,
@@ -150,151 +320,117 @@ const Socials = () => {
           zIndex: -1,
         }}
       />
-      <Box
-        sx={{
-          textAlign: "center",
-          zIndex: 1,
-        }}
-      >
-        <Typography
-          variant="h2"
-          gutterBottom
+      <Container maxWidth="md">
+        <Box
           sx={{
-            animation: `${fadeSlideIn} 1.5s ease-out forwards`,
-            display: "inline-block",
-            fontSize: "2.5rem",
-            opacity: 0,
-            "@media (min-width: 600px)": {
-              fontSize: "3.5rem",
-            },
+            backgroundColor: "rgba(0,0,0,0.4)",
+            backdropFilter: "blur(10px)",
+            borderRadius: "20px",
+            padding: "40px",
+            textAlign: "center",
+            boxShadow: "0 8px 32px 0 rgba(0, 0, 0, 0.3)",
           }}
         >
-          {name
-            ? `Hey, ${name}! Let's connect your socials`
-            : "Hey, let's connect your socials"}
-        </Typography>
+          <Typography
+            variant="h2"
+            gutterBottom
+            sx={{
+              fontSize: { xs: "2rem", md: "3.5rem" },
+              fontWeight: 600,
+              marginBottom: "30px",
+              color: "#ffffff",
+            }}
+          >
+            {name
+              ? `Hey, ${name}! Connect Your Socials`
+              : "Hey, Connect Your Socials"}
+          </Typography>
 
-        <Box
-          sx={{ mt: 4, display: "flex", gap: "20px", justifyContent: "center" }}
-        >
-          {/* GitHub Connect Button */}
-          {!githubConnected ? (
-            <IconButton
+          <Grid 
+            container 
+            spacing={3} 
+            justifyContent="center" 
+            alignItems="center"
+            sx={{ marginBottom: "30px" }}
+          >
+            {socialButtons.map((social, index) => (
+              <Grid item key={index}>
+                <IconButton
+                  onClick={social.onClick}
+                  sx={{
+                    color: social.color,
+                    fontSize: "3rem",
+                    background: "rgba(255,255,255,0.2)",
+                    borderRadius: "50%",
+                    padding: "15px",
+                    transition: "all 0.3s ease",
+                    animation: `${socialPulse} 2s infinite`,
+                    opacity: social.connected ? 0.5 : 1,
+                    "&:hover": {
+                      transform: "scale(1.1)",
+                      background: "rgba(255,255,255,0.3)",
+                    },
+                  }}
+                >
+                  <social.icon />
+                </IconButton>
+              </Grid>
+            ))}
+          </Grid>
+
+          <Box 
+            sx={{ 
+              display: "flex", 
+              flexDirection: "column", 
+              alignItems: "center", 
+              gap: "20px" 
+            }}
+          >
+            <Button
+              variant="contained"
+              onClick={checkMetaMask}
+              startIcon={<FaWallet />}
               sx={{
-                color: "#FFFFFF",
-                fontSize: "2.5rem",
-                animation: `${pulse} 2s infinite ease-in-out`,
+                backgroundColor: connectedAccounts.metamask ? "rgba(255,255,255,0.3)" : "rgba(255,255,255,0.2)",
+                color: "#ffffff",
+                fontSize: "1rem",
+                padding: "12px 24px",
+                borderRadius: "50px",
+                transition: "all 0.3s ease",
                 "&:hover": {
-                  color: "#FFFFFF",
-                  boxShadow: "0 0 10px rgba(0, 0, 0, 0.5)",
+                  backgroundColor: "rgba(255,255,255,0.4)",
+                  transform: "translateY(-5px)",
                 },
               }}
-              onClick={handleGithubConnect}
             >
-              <FaGithub />
-            </IconButton>
-          ) : (
-            <Typography variant="h6" sx={{ color: "#333", mt: 2 }}>
-              GitHub Connected!
-            </Typography>
-          )}
+              {connectedAccounts.metamask 
+                ? `Connected: ${account.substring(0, 6)}...${account.substring(account.length - 4)}` 
+                : "Connect MetaMask"}
+            </Button>
 
-          {/* Other Social Media Logos */}
-          <IconButton
-            sx={{
-              color: "#007FFF", // LinkedIn color
-              fontSize: "2.5rem",
-              animation: `${pulse} 2s infinite ease-in-out`,
-              "&:hover": {
-                color: "#007FFF",
-                boxShadow: "0 0 10px rgba(0, 0, 0, 0.5)",
-              },
-            }}
-          >
-            <FaLinkedin />
-          </IconButton>
-          <IconButton
-            sx={{
-              color: "#1DA1F2", // Twitter color
-              fontSize: "2.5rem",
-              animation: `${pulse} 2s infinite ease-in-out`,
-              "&:hover": {
-                color: "#1A91DA",
-                boxShadow: "0 0 10px rgba(0, 0, 0, 0.5)",
-              },
-            }}
-          >
-            <FaTwitter />
-          </IconButton>
-          <IconButton
-            sx={{
-              color: "#E4405F", // Instagram color
-              fontSize: "2.5rem",
-              animation: `${pulse} 2s infinite ease-in-out`,
-              "&:hover": {
-                color: "#C13584",
-                boxShadow: "0 0 10px rgba(0, 0, 0, 0.5)",
-              },
-            }}
-          >
-            <FaInstagram />
-          </IconButton>
+            {!allConnected && (
+              <Button
+                variant="outlined"
+                onClick={() => navigate("/profile", { state: { email } })}
+                sx={{
+                  borderColor: "rgba(255,255,255,0.5)",
+                  color: "#ffffff",
+                  fontSize: "1rem",
+                  padding: "10px 20px",
+                  borderRadius: "50px",
+                  transition: "all 0.3s ease",
+                  "&:hover": {
+                    backgroundColor: "rgba(255,255,255,0.1)",
+                    borderColor: "rgba(255,255,255,0.8)",
+                  },
+                }}
+              >
+                Skip for Now
+              </Button>
+            )}
+          </Box>
         </Box>
-
-        {/* Skip Button */}
-        <Button
-          variant="contained"
-          onClick={handleSkip}
-          sx={{
-            mt: 4,
-            backgroundColor: "#ffffff",
-            color: "#121212",
-            fontSize: "1.2rem",
-            padding: "10px 20px",
-            borderRadius: "50px",
-            animation: `${fadeSlideIn} 2s ease-out`,
-            "&:hover": {
-              backgroundColor: "#ddd",
-              boxShadow: "0 0 10px rgba(0, 0, 0, 0.5)",
-            },
-          }}
-        >
-          Skip for now
-        </Button>
-
-        {/* MetaMask Connection Button */}
-      <Button
-        onClick={checkMetaMask}
-        variant="contained"
-        sx={{
-          mt: 4,
-          backgroundColor: isMetaMaskConnected ? "#4CAF50" : "#FF5722",
-          color: "#fff",
-          fontSize: "1rem",
-          padding: "10px 20px",
-          borderRadius: "50px",
-          "&:hover": {
-            backgroundColor: isMetaMaskConnected ? "#45a049" : "#e64a19",
-          },
-        }}
-      >
-        {isMetaMaskConnected ? `Connected: ${account}` : "Connect MetaMask"}
-      </Button>
-
-      {/* Display connected MetaMask account */}
-      {isMetaMaskConnected && (
-        <Typography
-          variant="h6"
-          sx={{
-            mt: 2,
-            color: "#4CAF50",
-          }}
-        >
-          Connected Account: {account}
-        </Typography>
-      )}
-        
-      </Box>
+      </Container>
     </Box>
   );
 };
