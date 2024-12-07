@@ -258,8 +258,6 @@ const Socials = () => {
     }
   };
 
-  const allConnected = Object.values(connectedAccounts).every(v => v === true);
-
   const socialButtons = [
     { 
       provider: 'github',
@@ -381,7 +379,7 @@ const Socials = () => {
           <Box 
             sx={{ 
               display: "flex", 
-              flexDirection: "column", 
+              justifyContent: "center", 
               alignItems: "center", 
               gap: "20px" 
             }}
@@ -407,27 +405,6 @@ const Socials = () => {
                 ? `Connected: ${account.substring(0, 6)}...${account.substring(account.length - 4)}` 
                 : "Connect MetaMask"}
             </Button>
-
-            {!allConnected && (
-              <Button
-                variant="outlined"
-                onClick={() => navigate("/profile", { state: { email } })}
-                sx={{
-                  borderColor: "rgba(255,255,255,0.5)",
-                  color: "#ffffff",
-                  fontSize: "1rem",
-                  padding: "10px 20px",
-                  borderRadius: "50px",
-                  transition: "all 0.3s ease",
-                  "&:hover": {
-                    backgroundColor: "rgba(255,255,255,0.1)",
-                    borderColor: "rgba(255,255,255,0.8)",
-                  },
-                }}
-              >
-                Skip for Now
-              </Button>
-            )}
           </Box>
         </Box>
       </Container>
