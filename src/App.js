@@ -6,6 +6,8 @@ import Ques from "./pages/Ques";
 import Socials from "./pages/socials";
 import profile from "./pages/profile";
 import Profile from "./pages/profile";
+import CompanyReg from './pages/companyReg';
+import CompanyDashboard from "./pages/CompanyDashboard";
 
 function App() {
   return (
@@ -16,6 +18,8 @@ function App() {
           <Route path="/Ques" element={<Ques />} />
           <Route path="/Socials" element={<Socials />} />
           <Route path="/Profile" element={<Profile />} />
+          <Route path="/comp" element={<CompanyReg />} />
+          <Route path="/company-dashboard" element={<CompanyDashboard/>}/>
         </Routes>
       </div>
     </Router>

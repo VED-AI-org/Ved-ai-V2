@@ -48,18 +48,18 @@ const Int = () => {
           <div style={styles.textContainer}>
             <p style={styles.subtitle}>Let's dive in</p>
             <div style={styles.buttonContainer}>
-              <button
-                style={
-                  isHoveringSignIn
-                    ? { ...styles.button, ...styles.buttonHover }
-                    : styles.button
-                }
-                onMouseEnter={() => setIsHoveringSignIn(true)}
-                onMouseLeave={() => setIsHoveringSignIn(false)}
-                onClick={handleSignIn}
-              >
-                Sign In
-              </button>
+            <button
+  style={
+    isHoveringSignIn
+      ? { ...styles.button, ...styles.buttonHover }
+      : styles.button
+  }
+  onMouseEnter={() => setIsHoveringSignIn(true)}
+  onMouseLeave={() => setIsHoveringSignIn(false)}
+  onClick={() => navigate("/comp")}
+>
+  Company Sign up
+</button>
               <button
                 style={
                   isHoveringSignUp
@@ -70,7 +70,7 @@ const Int = () => {
                 onMouseLeave={() => setIsHoveringSignUp(false)}
                 onClick={() => navigate("/ques")}
               >
-                Sign Up
+                User Sign Up
               </button>
             </div>
           </div>
