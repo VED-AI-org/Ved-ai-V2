@@ -1,264 +1,274 @@
 import React, { useState, useEffect } from "react";
-import { Box, TextField, Typography, Button, Chip } from "@mui/material";
 import { useNavigate } from "react-router-dom";
-import { supabase } from "./supabaseClient";
 
-const Ques = () => {
-  const questions = [
-    "Okay, first: What's your email address?",
-    "And what's your name (Ex: Ace)",
-  ];
-
-  const interests = [
-    "Java",
-    "Python",
-    "Web Development",
-    "AI",
-    "Machine Learning",
-    "Data Science",
-    "Blockchain",
-    "Cloud Computing",
-    "Cybersecurity",
-  ];
-
-  const relatedInterests = {
-    Java: ["Spring", "JavaFX", "Android Development"],
-    Python: ["Data Science", "Machine Learning", "Django"],
-    WebDevelopment: ["React", "Node.js", "CSS"],
-    // Add more related interests here
-  };
-
-  const [displayedText, setDisplayedText] = useState("");
-  const [answer, setAnswer] = useState("");
-  const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
-  const [answers, setAnswers] = useState([]);
-  const [email, setEmail] = useState("");
-  const [selectedInterests, setSelectedInterests] = useState([]);
-  const [suggestedInterests, setSuggestedInterests] = useState([]);
+const Int = () => {
   const navigate = useNavigate();
+  const [showOverlay, setShowOverlay] = useState(false);
+  const [isHoveringSignIn, setIsHoveringSignIn] = useState(false);
+  const [isHoveringSignUp, setIsHoveringSignUp] = useState(false);
+  const [showSignInModal, setShowSignInModal] = useState(false);
 
   useEffect(() => {
-    if (questions[currentQuestionIndex]) {
-      let currentText = "";
-      let charIndex = 0;
+    const timer = setTimeout(() => {
+      setShowOverlay(true);
+    }, 8000); fail
 
-      const typeChar = () => {
-        if (charIndex < questions[currentQuestionIndex].length) {
-          currentText += questions[currentQuestionIndex][charIndex];
-          setDisplayedText(currentText);
-          charIndex++;
-          setTimeout(typeChar, 50);
-        }
-      };
+    return () => clearTimeout(timer);
+  }, []);
 
-      typeChar();
-    }
-  }, [currentQuestionIndex]);
-
-  const handleAnswerSubmit = async () => {
-    if (answer.trim() !== "") {
-      if (currentQuestionIndex === 0) setEmail(answer);
-
-      const updatedAnswers = [...answers, answer];
-      setAnswers(updatedAnswers);
-      setAnswer("");
-
-      if (currentQuestionIndex < questions.length - 1) {
-        setCurrentQuestionIndex(currentQuestionIndex + 1);
-      } else {
-        setCurrentQuestionIndex(-1); // Move to interest selection screen
-      }
-    }
+  // Handlers for opening and closing the Sign In modal
+  const handleSignIn = () => {
+    setShowSignInModal(true);
   };
 
-  const handleInterestClick = (interest) => {
-    if (!selectedInterests.includes(interest)) {
-      setSelectedInterests([...selectedInterests, interest]);
-      setSuggestedInterests(relatedInterests[interest] || []);
-    }
+  const closeSignInModal = () => {
+    setShowSignInModal(false);
   };
 
-  const handleRemoveInterest = (interest) => {
-    setSelectedInterests(selectedInterests.filter((item) => item !== interest));
-    if (relatedInterests[interest]) setSuggestedInterests([]);
+  // Function to handle form submission (for Sign In)
+  const handleSignInSubmit = (e) => {
+    e.preventDefault();
+    console.log("Sign In form submitted");
   };
 
-  const handleSubmitAll = async () => {
-    try {
-      const { data, error } = await supabase.from("answer").insert([
-        {
-          email,
-          name: answers[1],
-          interests: selectedInterests.join(", "),
-          created_at: new Date(),
-        },
-      ]);
-
-      if (error) throw error;
-
-      // Add a slight delay before navigating to the profile page
-      setTimeout(() => {
-        navigate("/profile", { state: { email }, replace: true });
-      }, 500); // 500ms delay for soft transition
-    } catch (error) {
-      console.error("Error saving answers: ", error);
-    }
-  };
   return (
-    <Box
-      sx={{
-        display: "flex",
-        height: "100vh",
-        width: "100vw",
-        backgroundColor: "#121212",
-        color: "#ffffff",
-        position: "relative",
-        top: 0,
-        left: 0,
-        flexDirection: { xs: "column", sm: "row" },
-      }}
-    >
-      {/* Left Side: Image */}
-      <Box
-        sx={{
-          flex: 1,
-          position: "relative",
-          overflow: "hidden",
-          display: { xs: "none", sm: "block" },
-        }}
-      >
-        <img
-          src="/VED.png" // Replace with your image file path
-          alt="Left Side"
-          style={{
-            width: "100%",
-            height: "100%",
-            objectFit: "cover",
-          }}
-        />
-      </Box>
+    <div style={styles.container}>
+      <video
+        src="/VED2.mp4" // Replace with your video URL
+        autoPlay
+        muted
+        loop
+        playsInline
+        controls={false}
+        style={styles.video}
+      />
 
-      {/* Right Side: Form */}
-      <Box
-        sx={{
-          flex: 3,
-          p: 4,
-          display: "flex",
-          flexDirection: "column",
-          justifyContent: "center",
-          alignItems: "center",
-          position: "relative",
-          zIndex: 1,
-          textAlign: "center",
-        }}
-      >
-        {currentQuestionIndex >= 0 && (
-          <>
-            <Typography
-              variant="h2"
-              sx={{ fontSize: { xs: "1.8rem", sm: "2.7rem" }, marginBottom: 3 }}
-            >
-              {displayedText}
-            </Typography>
-            <Box
-              sx={{
-                backgroundColor: "rgba(0 0 0 / 17%)",
-                backdropFilter: "blur(10px)",
-                borderRadius: "15px",
-                boxShadow: "0px 4px 20px rgba(14 0 134)",
-                padding: "20px",
-                width: "100%",
-                maxWidth: "500px",
-                transition: "all 0.3s ease-in-out",
-                "&:hover": {
-                  boxShadow: "0px 6px 30px rgba(255, 255, 255, 0.3)",
-                },
-              }}
-            >
-              <TextField
-                label="Your Answer"
-                name="answer"
-                value={answer}
-                onChange={(e) => setAnswer(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && handleAnswerSubmit()}
-                fullWidth
-                margin="normal"
-                sx={{
-                  input: { color: "#ffffff", fontSize: "1.3rem" },
-                  label: { color: "#bbbbbb", fontSize: "1.3rem" },
-                  "& .MuiOutlinedInput-root": {
-                    "& fieldset": { borderColor: "rgba(255, 255, 255, 0.5)" },
-                    "&:hover fieldset": { borderColor: "#ffffff" },
-                    "&.Mui-focused fieldset": { borderColor: "#ffffff" },
-                  },
-                }}
+      {showOverlay && (
+        <div style={styles.overlay}>
+          <div style={styles.textContainer}>
+            <p style={styles.subtitle}>Let's dive in</p>
+            <div style={styles.buttonContainer}>
+              <button
+                style={
+                  isHoveringSignIn
+                    ? { ...styles.button, ...styles.buttonHover }
+                    : styles.button
+                }
+                onMouseEnter={() => setIsHoveringSignIn(true)}
+                onMouseLeave={() => setIsHoveringSignIn(false)}
+                onClick={handleSignIn}
+              >
+                Sign In
+              </button>
+              <button
+                style={
+                  isHoveringSignUp
+                    ? { ...styles.button, ...styles.buttonHover }
+                    : styles.button
+                }
+                onMouseEnter={() => setIsHoveringSignUp(true)}
+                onMouseLeave={() => setIsHoveringSignUp(false)}
+                onClick={() => navigate("/ques")}
+              >
+                Sign Up
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Enhanced Sign In Modal */}
+      {showSignInModal && (
+        <div style={styles.modalOverlay}>
+          <div style={styles.modalContent}>
+            <h2 style={styles.modalTitle}>Sign In</h2>
+            <form onSubmit={handleSignInSubmit}>
+              <input
+                type="email"
+                placeholder="Email"
+                required
+                style={styles.inputField}
               />
-            </Box>
-          </>
-        )}
+              <input
+                type="password"
+                placeholder="Password"
+                required
+                style={styles.inputField}
+              />
+              <button type="submit" style={styles.submitButton}>
+                Sign In
+              </button>
+              <button
+                type="button"
+                style={styles.closeButton}
+                onClick={closeSignInModal}
+              >
+                Close
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
 
-        {currentQuestionIndex === -1 && (
-          <Box>
-            <Typography variant="h2" sx={{ marginBottom: 3 }}>
-              Select Your Interests
-            </Typography>
-            <Box
-              sx={{
-                display: "flex",
-                flexWrap: "wrap",
-                justifyContent: "center",
-                gap: 2,
-                marginBottom: 3,
-              }}
-            >
-              {interests.map((interest) => (
-                <Chip
-                  key={interest}
-                  label={interest}
-                  onClick={() => handleInterestClick(interest)}
-                  sx={{
-                    background: selectedInterests.includes(interest)
-                      ? "linear-gradient(45deg, #ff8a00, #e52e71)"
-                      : "linear-gradient(45deg, #333, #444)",
-                    color: "#ffffff",
-                    fontSize: "1rem",
-                    padding: "10px",
-                    cursor: "pointer",
-                    transition: "all 0.3s ease-in-out",
-                    boxShadow: selectedInterests.includes(interest)
-                      ? "0px 4px 10px rgba(255, 255, 255, 0.3)"
-                      : "0px 4px 8px rgba(0, 0, 0, 0.3)",
-                    "&:hover": {
-                      boxShadow: "0px 6px 15px rgba(255, 255, 255, 0.4)",
-                    },
-                  }}
-                />
-              ))}
-            </Box>
+      <style>
+        {`
+          @keyframes fadeInOverlay {
+            0% {
+              opacity: 0;
+            }
+            100% {
+              opacity: 1;
+            }
+          }
 
-            <Button
-              variant="contained"
-              color="primary"
-              sx={{
-                marginTop: 4,
-                padding: "10px 20px",
-                background: "linear-gradient(45deg, #ff6b6b, #f06595)",
-                boxShadow: "0px 4px 20px rgba(240, 101, 149, 0.4)",
-                transition: "all 0.3s ease-in-out",
-                "&:hover": {
-                  boxShadow: "0px 6px 30px rgba(240, 101, 149, 0.6)",
-                  background: "linear-gradient(45deg, #f06595, #ff6b6b)",
-                },
-              }}
-              onClick={handleSubmitAll}
-            >
-              Submit
-            </Button>
-          </Box>
-        )}
-      </Box>
-    </Box>
+          @keyframes fadeInScale {
+            0% {
+              opacity: 0;
+              transform: scale(0.9);
+            }
+            50% {
+              opacity: 1;
+              transform: scale(1.05);
+            }
+            100% {
+              opacity: 1;
+              transform: scale(1);
+            }
+          }
+
+          @keyframes slideUp {
+            from {
+              opacity: 0;
+              transform: translateY(50px);
+            }
+            to {
+              opacity: 1;
+              transform: translateY(0);
+            }
+          }
+        `}
+      </style>
+    </div>
   );
 };
 
-export default Ques;
+const styles = {
+  container: {
+    position: "relative",
+    height: "100vh",
+    width: "100vw",
+    backgroundColor: "#000",
+    overflow: "hidden",
+  },
+  video: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    width: "100%",
+    height: "100%",
+    objectFit: "cover",
+    pointerEvents: "none",
+  },
+  overlay: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    width: "100%",
+    height: "100%",
+    backgroundColor: "rgba(0, 0, 0, 0.5)",
+    display: "flex",
+    justifyContent: "center",
+    alignItems: "center",
+    animation: "fadeInOverlay 2s ease-in-out",
+  },
+  textContainer: {
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "center",
+    animation: "fadeInScale 2s ease-in-out",
+  },
+  subtitle: {
+    fontSize: "28px",
+    color: "#fff",
+    marginBottom: "30px",
+    fontWeight: "400",
+    letterSpacing: "1px",
+    textAlign: "center",
+  },
+  buttonContainer: {
+    display: "flex",
+    gap: "20px",
+  },
+  button: {
+    backgroundColor: "transparent",
+    color: "#fff",
+    padding: "10px 20px",
+    fontSize: "16px",
+    border: "1px solid #fff",
+    borderRadius: "25px",
+    cursor: "pointer",
+    transition: "background-color 0.3s ease, transform 0.3s ease",
+  },
+  buttonHover: {
+    backgroundColor: "#fff",
+    color: "#000",
+    transform: "scale(1.05)",
+  },
+  modalOverlay: {
+    position: "fixed",
+    top: 0,
+    left: 0,
+    width: "100vw",
+    height: "100vh",
+    backgroundColor: "rgba(0, 0, 0, 0.8)", // More transparent for a smooth effect
+    display: "flex",
+    justifyContent: "center",
+    alignItems: "center",
+    animation: "fadeInOverlay 0.5s ease-in-out",
+  },
+  modalContent: {
+    backgroundColor: "rgba(255, 255, 255, 0.95)", // Slight transparency
+    padding: "40px",
+    borderRadius: "15px", // Softer border-radius
+    boxShadow: "0px 8px 30px rgba(0, 0, 0, 0.2)", // Stronger shadow for depth
+    animation: "slideUp 0.5s ease-in-out", // Slide-up effect for opening
+    textAlign: "center",
+    width: "400px",
+  },
+  modalTitle: {
+    fontSize: "24px",
+    marginBottom: "20px",
+    color: "#333",
+    animation: "fadeInOverlay 0.5s ease-in-out", // Smooth title fade-in
+  },
+  inputField: {
+    width: "100%",
+    padding: "12px",
+    margin: "12px 0",
+    borderRadius: "8px", // Softer corners for input
+    border: "1px solid #ccc",
+    fontSize: "16px",
+  },
+  submitButton: {
+    width: "100%",
+    padding: "12px",
+    backgroundColor: "#ff4757",
+    color: "#fff",
+    border: "none",
+    borderRadius: "8px",
+    cursor: "pointer",
+    marginBottom: "10px",
+    transition: "background-color 0.3s ease",
+  },
+  closeButton: {
+    width: "100%",
+    padding: "12px",
+    backgroundColor: "#ccc",
+    color: "#333",
+    border: "none",
+    borderRadius: "8px",
+    cursor: "pointer",
+  },
+};
+
+export default Int;
