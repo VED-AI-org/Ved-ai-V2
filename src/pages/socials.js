@@ -20,6 +20,8 @@ const Socials = () => {
   const { state } = useLocation();
   const [name, setName] = useState("");
   const [githubConnected, setGithubConnected] = useState(false);
+  const [account, setAccount] = useState(null);
+  const [isMetaMaskConnected, setIsMetaMaskConnected] = useState(false);
   const email = state?.email; // Safely get the email
 
   const navigate = useNavigate(); // Initialize useNavigate
@@ -51,6 +53,39 @@ const Socials = () => {
 
     fetchName();
   }, [email]);
+
+  // MetaMask Connection Check
+  const checkMetaMask = async () => {
+    if (typeof window.ethereum !== "undefined") {
+      try {
+        const accounts = await window.ethereum.request({
+          method: "eth_requestAccounts",
+        });
+        setAccount(accounts[0]);
+        setIsMetaMaskConnected(true);
+      } catch (error) {
+        console.error("Error connecting to MetaMask:", error);
+      }
+    } else {
+      console.error("MetaMask is not installed!");
+      alert("Please install MetaMask to use this feature.");
+    }
+  };
+
+  // Handle MetaMask account changes
+  useEffect(() => {
+    if (typeof window.ethereum !== "undefined") {
+      window.ethereum.on("accountsChanged", (accounts) => {
+        if (accounts.length > 0) {
+          setAccount(accounts[0]);
+          setIsMetaMaskConnected(true);
+        } else {
+          setAccount(null);
+          setIsMetaMaskConnected(false);
+        }
+      });
+    }
+  }, []);
 
   const handleGithubConnect = async () => {
     const { user, session, error } = await supabase.auth.signInWithOAuth({
@@ -226,6 +261,39 @@ const Socials = () => {
         >
           Skip for now
         </Button>
+
+        {/* MetaMask Connection Button */}
+      <Button
+        onClick={checkMetaMask}
+        variant="contained"
+        sx={{
+          mt: 4,
+          backgroundColor: isMetaMaskConnected ? "#4CAF50" : "#FF5722",
+          color: "#fff",
+          fontSize: "1rem",
+          padding: "10px 20px",
+          borderRadius: "50px",
+          "&:hover": {
+            backgroundColor: isMetaMaskConnected ? "#45a049" : "#e64a19",
+          },
+        }}
+      >
+        {isMetaMaskConnected ? `Connected: ${account}` : "Connect MetaMask"}
+      </Button>
+
+      {/* Display connected MetaMask account */}
+      {isMetaMaskConnected && (
+        <Typography
+          variant="h6"
+          sx={{
+            mt: 2,
+            color: "#4CAF50",
+          }}
+        >
+          Connected Account: {account}
+        </Typography>
+      )}
+        
       </Box>
     </Box>
   );
