@@ -7,9 +7,12 @@ import {
   Button, 
   useMediaQuery, 
   useTheme, 
-  Container 
+  Container,
+  Snackbar,
+  Alert
 } from "@mui/material";
 import { useNavigate } from "react-router-dom";
+import supabase from './supabaseClient'; // Import the supabase client
 
 const Ques = () => {
   const theme = useTheme();
@@ -38,6 +41,10 @@ const Ques = () => {
   });
   const [introCompleted, setIntroCompleted] = useState(false);
   const [selectedDomain, setSelectedDomain] = useState(null);
+  
+  // Supabase submission states
+  const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState(null);
 
   // Typewriter effect
   const typeWriter = useCallback((text, callback) => {
@@ -77,7 +84,7 @@ const Ques = () => {
     const newFormData = { ...formData };
 
     if (currentQuestionIndex === 0) {
-      // Basic email validation
+      // Email validation
       const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
       if (!emailRegex.test(trimmedAnswer)) {
         alert("Please enter a valid email address");
@@ -105,7 +112,7 @@ const Ques = () => {
     setSelectedDomain(domain);
   };
 
-  const proceedToSocials = () => {
+  const proceedToSocials = async () => {
     if (!selectedDomain) {
       alert("Please select a professional domain");
       return;
@@ -116,10 +123,38 @@ const Ques = () => {
       domain: selectedDomain
     };
 
-    navigate("/socials", {
-      state: finalFormData,
-      replace: true,
-    });
+    try {
+      setSubmitting(true);
+      
+      // Insert data into Supabase 'socials' table
+      const { data, error } = await supabase
+        .from('socials')
+        .insert([
+          {
+            email: finalFormData.email,
+            name: finalFormData.name,
+            domain: finalFormData.domain,
+            created_at: new Date()
+          }
+        ])
+        .select();
+
+      if (error) {
+        console.error('Error inserting data into Supabase:', error);
+        throw error;
+      }
+      
+      // Navigate to next page
+      navigate("/socials", {
+        state: finalFormData,
+        replace: true,
+      });
+    } catch (error) {
+      console.error('Error during submission:', error);
+      setSubmitError(error.message);
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   const renderQuestionContent = () => {
@@ -191,6 +226,7 @@ const Ques = () => {
                 color="primary"
                 size="large"
                 onClick={proceedToSocials}
+                disabled={submitting}
                 sx={{
                   borderRadius: 6,
                   px: 8,
@@ -198,7 +234,7 @@ const Ques = () => {
                   fontSize: isMobile ? "1.2rem" : "1.5rem",
                 }}
               >
-                Next
+                {submitting ? "Saving..." : "Next"}
               </Button>
             </Box>
           )}
@@ -384,6 +420,23 @@ const Ques = () => {
           )}
         </AnimatePresence>
       </Container>
+
+      {submitError && (
+        <Snackbar 
+          open={Boolean(submitError)} 
+          autoHideDuration={6000} 
+          onClose={() => setSubmitError(null)}
+          anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
+        >
+          <Alert 
+            onClose={() => setSubmitError(null)} 
+            severity="error" 
+            sx={{ width: '100%' }}
+          >
+            {submitError}
+          </Alert>
+        </Snackbar>
+      )}
     </Box>
   );
 };

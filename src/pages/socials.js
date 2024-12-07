@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { Box, Typography, IconButton, Button, Container, Grid } from "@mui/material";
 import { FaGithub, FaLinkedin, FaTwitter, FaInstagram, FaWallet } from "react-icons/fa";
-import { useLocation, useNavigate } from "react-router-dom";
+import { useLocation } from "react-router-dom";
 import { supabase } from "./supabaseClient";
 import { keyframes } from "@mui/system";
 
@@ -19,12 +19,10 @@ const Socials = () => {
     linkedin: false,
     twitter: false,
     instagram: false,
-    metamask: false
+    metamask: false,
   });
   const [account, setAccount] = useState(null);
   const email = state?.email;
-
-  const navigate = useNavigate();
 
   useEffect(() => {
     const fetchName = async () => {
@@ -43,70 +41,88 @@ const Socials = () => {
         if (error) throw error;
 
         if (data.length > 0) {
-          const userName = data[0].answer;
-          setName(userName || "");
+          setName(data[0].answer || "");
         }
       } catch (error) {
         console.error("Error fetching name: ", error);
       }
     };
 
-    const checkExistingConnections = async () => {
+    const fetchConnections = async () => {
       if (!email) return;
 
       try {
-        // Check GitHub connection
-        const { data: githubData } = await supabase
-          .from("github_accounts")
-          .select("*")
-          .eq("email", email)
-          .single();
+        const socialTypes = ["github", "linkedin", "twitter", "instagram"];
+        const updates = {};
 
-        // Check LinkedIn connection
-        const { data: linkedinData } = await supabase
-          .from("linkedin_accounts")
-          .select("*")
-          .eq("email", email)
-          .single();
+        for (const type of socialTypes) {
+          const { data } = await supabase
+            .from(`${type}_accounts`)
+            .select("*")
+            .eq("email", email)
+            .single();
+          updates[type] = !!data;
+        }
 
-        // Check Twitter connection
-        const { data: twitterData } = await supabase
-          .from("twitter_accounts")
-          .select("*")
-          .eq("email", email)
-          .single();
-
-        // Check Instagram connection
-        const { data: instagramData } = await supabase
-          .from("instagram_accounts")
-          .select("*")
-          .eq("email", email)
-          .single();
-
-        setConnectedAccounts({
-          github: !!githubData,
-          linkedin: !!linkedinData,
-          twitter: !!twitterData,
-          instagram: !!instagramData,
-          metamask: false // This will be updated separately
-        });
+        setConnectedAccounts((prev) => ({ ...prev, ...updates }));
       } catch (error) {
-        console.error("Error checking existing connections:", error);
+        console.error("Error fetching social connections:", error);
       }
     };
 
     fetchName();
-    checkExistingConnections();
+    fetchConnections();
   }, [email]);
 
-  const checkMetaMask = async () => {
+  const handleSocialConnect = async (provider) => {
+    try {
+      const { user, session, error } = await supabase.auth.signInWithOAuth({
+        provider,
+      });
+
+      if (error) throw error;
+
+      if (user && session) {
+        const userMetadata = user.user_metadata;
+
+        const upsertData = {
+          email,
+          [`${provider}_id`]: userMetadata.user_id,
+          [`${provider}_username`]: userMetadata.user_name,
+          [`${provider}_avatar`]: userMetadata.avatar_url,
+        };
+
+        const { error: upsertError } = await supabase
+          .from(`${provider}_accounts`)
+          .upsert(upsertData);
+
+        if (upsertError) throw upsertError;
+
+        setConnectedAccounts((prev) => ({ ...prev, [provider]: true }));
+      }
+    } catch (error) {
+      console.error(`Error connecting ${provider}:`, error);
+    }
+  };
+
+  const handleMetaMaskConnect = async () => {
     if (typeof window.ethereum !== "undefined") {
       try {
         const accounts = await window.ethereum.request({
           method: "eth_requestAccounts",
         });
-        setAccount(accounts[0]);
-        setConnectedAccounts(prev => ({ ...prev, metamask: true }));
+
+        const walletAddress = accounts[0];
+        setAccount(walletAddress);
+
+        const { error } = await supabase.from("metamask_accounts").upsert({
+          email,
+          wallet_address: walletAddress,
+        });
+
+        if (error) throw error;
+
+        setConnectedAccounts((prev) => ({ ...prev, metamask: true }));
       } catch (error) {
         console.error("Error connecting to MetaMask:", error);
       }
@@ -115,177 +131,30 @@ const Socials = () => {
     }
   };
 
-  useEffect(() => {
-    if (typeof window.ethereum !== "undefined") {
-      window.ethereum.on("accountsChanged", (accounts) => {
-        if (accounts.length > 0) {
-          setAccount(accounts[0]);
-          setConnectedAccounts(prev => ({ ...prev, metamask: true }));
-        } else {
-          setAccount(null);
-          setConnectedAccounts(prev => ({ ...prev, metamask: false }));
-        }
-      });
-    }
-  }, []);
-
-  const handleSocialConnect = async (provider) => {
-    const providerMap = {
-      github: async () => {
-        const { user, session, error } = await supabase.auth.signInWithOAuth({
-          provider: "github",
-        });
-
-        if (error) {
-          console.error("GitHub login error:", error);
-          return false;
-        }
-
-        if (session && user) {
-          try {
-            await supabase
-              .from("github_accounts")
-              .upsert({
-                email: email,
-                github_id: user.user_metadata.user_id,
-                github_username: user.user_metadata.user_name,
-                github_avatar: user.user_metadata.avatar_url,
-              });
-
-            return true;
-          } catch (error) {
-            console.error("Error saving GitHub data:", error);
-            return false;
-          }
-        }
-        return false;
-      },
-      linkedin: async () => {
-        const { user, session, error } = await supabase.auth.signInWithOAuth({
-          provider: "linkedin",
-        });
-
-        if (error) {
-          console.error("LinkedIn login error:", error);
-          return false;
-        }
-
-        if (session && user) {
-          try {
-            await supabase
-              .from("linkedin_accounts")
-              .upsert({
-                email: email,
-                linkedin_id: user.user_metadata.user_id,
-                linkedin_username: user.user_metadata.user_name,
-                linkedin_avatar: user.user_metadata.avatar_url,
-              });
-
-            return true;
-          } catch (error) {
-            console.error("Error saving LinkedIn data:", error);
-            return false;
-          }
-        }
-        return false;
-      },
-      twitter: async () => {
-        const { user, session, error } = await supabase.auth.signInWithOAuth({
-          provider: "twitter",
-        });
-
-        if (error) {
-          console.error("Twitter login error:", error);
-          return false;
-        }
-
-        if (session && user) {
-          try {
-            await supabase
-              .from("twitter_accounts")
-              .upsert({
-                email: email,
-                twitter_id: user.user_metadata.user_id,
-                twitter_username: user.user_metadata.user_name,
-                twitter_avatar: user.user_metadata.avatar_url,
-              });
-
-            return true;
-          } catch (error) {
-            console.error("Error saving Twitter data:", error);
-            return false;
-          }
-        }
-        return false;
-      },
-      instagram: async () => {
-        const { user, session, error } = await supabase.auth.signInWithOAuth({
-          provider: "instagram",
-        });
-
-        if (error) {
-          console.error("Instagram login error:", error);
-          return false;
-        }
-
-        if (session && user) {
-          try {
-            await supabase
-              .from("instagram_accounts")
-              .upsert({
-                email: email,
-                instagram_id: user.user_metadata.user_id,
-                instagram_username: user.user_metadata.user_name,
-                instagram_avatar: user.user_metadata.avatar_url,
-              });
-
-            return true;
-          } catch (error) {
-            console.error("Error saving Instagram data:", error);
-            return false;
-          }
-        }
-        return false;
-      }
-    };
-
-    const connectFunction = providerMap[provider];
-    if (connectFunction) {
-      const success = await connectFunction();
-      if (success) {
-        setConnectedAccounts(prev => ({ ...prev, [provider]: true }));
-      }
-    }
-  };
-
   const socialButtons = [
-    { 
-      provider: 'github',
-      icon: FaGithub, 
-      color: connectedAccounts.github ? "#4CAF50" : "#ffffff", 
-      connected: connectedAccounts.github, 
-      onClick: () => handleSocialConnect('github') 
+    {
+      provider: "github",
+      icon: FaGithub,
+      color: connectedAccounts.github ? "#4CAF50" : "#ffffff",
+      onClick: () => handleSocialConnect("github"),
     },
-    { 
-      provider: 'linkedin',
-      icon: FaLinkedin, 
-      color: connectedAccounts.linkedin ? "#0077B5" : "#ffffff", 
-      connected: connectedAccounts.linkedin, 
-      onClick: () => handleSocialConnect('linkedin') 
+    {
+      provider: "linkedin",
+      icon: FaLinkedin,
+      color: connectedAccounts.linkedin ? "#0077B5" : "#ffffff",
+      onClick: () => handleSocialConnect("linkedin"),
     },
-    { 
-      provider: 'twitter',
-      icon: FaTwitter, 
-      color: connectedAccounts.twitter ? "#1DA1F2" : "#ffffff", 
-      connected: connectedAccounts.twitter, 
-      onClick: () => handleSocialConnect('twitter') 
+    {
+      provider: "twitter",
+      icon: FaTwitter,
+      color: connectedAccounts.twitter ? "#1DA1F2" : "#ffffff",
+      onClick: () => handleSocialConnect("twitter"),
     },
-    { 
-      provider: 'instagram',
-      icon: FaInstagram, 
-      color: connectedAccounts.instagram ? "#E1306C" : "#ffffff", 
-      connected: connectedAccounts.instagram, 
-      onClick: () => handleSocialConnect('instagram') 
+    {
+      provider: "instagram",
+      icon: FaInstagram,
+      color: connectedAccounts.instagram ? "#E1306C" : "#ffffff",
+      onClick: () => handleSocialConnect("instagram"),
     },
   ];
 
@@ -344,10 +213,10 @@ const Socials = () => {
               : "Hey, Connect Your Socials"}
           </Typography>
 
-          <Grid 
-            container 
-            spacing={3} 
-            justifyContent="center" 
+          <Grid
+            container
+            spacing={3}
+            justifyContent="center"
             alignItems="center"
             sx={{ marginBottom: "30px" }}
           >
@@ -376,20 +245,22 @@ const Socials = () => {
             ))}
           </Grid>
 
-          <Box 
-            sx={{ 
-              display: "flex", 
-              justifyContent: "center", 
-              alignItems: "center", 
-              gap: "20px" 
+          <Box
+            sx={{
+              display: "flex",
+              justifyContent: "center",
+              alignItems: "center",
+              gap: "20px",
             }}
           >
             <Button
               variant="contained"
-              onClick={checkMetaMask}
+              onClick={handleMetaMaskConnect}
               startIcon={<FaWallet />}
               sx={{
-                backgroundColor: connectedAccounts.metamask ? "rgba(255,255,255,0.3)" : "rgba(255,255,255,0.2)",
+                backgroundColor: connectedAccounts.metamask
+                  ? "rgba(255,255,255,0.3)"
+                  : "rgba(255,255,255,0.2)",
                 color: "#ffffff",
                 fontSize: "1rem",
                 padding: "12px 24px",
@@ -401,8 +272,10 @@ const Socials = () => {
                 },
               }}
             >
-              {connectedAccounts.metamask 
-                ? `Connected: ${account.substring(0, 6)}...${account.substring(account.length - 4)}` 
+              {connectedAccounts.metamask
+                ? `Connected: ${account.substring(0, 6)}...${account.substring(
+                    account.length - 4
+                  )}`
                 : "Connect MetaMask"}
             </Button>
           </Box>
