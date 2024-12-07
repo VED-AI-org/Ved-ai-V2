@@ -1,274 +1,349 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
+import { 
+  motion, 
+  AnimatePresence 
+} from "framer-motion";
+import { 
+  Box, 
+  Typography, 
+  TextField, 
+  Button, 
+  useMediaQuery, 
+  useTheme 
+} from "@mui/material";
 import { useNavigate } from "react-router-dom";
 
-const Int = () => {
+const Ques = () => {
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
   const navigate = useNavigate();
-  const [showOverlay, setShowOverlay] = useState(false);
-  const [isHoveringSignIn, setIsHoveringSignIn] = useState(false);
-  const [isHoveringSignUp, setIsHoveringSignUp] = useState(false);
-  const [showSignInModal, setShowSignInModal] = useState(false);
+  const videoRef = useRef(null);
 
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      setShowOverlay(true);
-    }, 8000); fail
+  const questions = [
+    "What's your email address?",
+    "What's your name?",
+    "Select your professional domain"
+  ];
 
-    return () => clearTimeout(timer);
+  const domains = [
+    "Tech", "Marketing", "Sales", "Design", "Finance", 
+    "Healthcare", "Education", "Gaming", "Content Creation", "Data Science"
+  ];
+
+  const [displayedText, setDisplayedText] = useState("");
+  const [answer, setAnswer] = useState("");
+  const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
+  const [formData, setFormData] = useState({
+    email: "",
+    name: "",
+    domain: ""
+  });
+
+  // Typewriter effect
+  const typeWriter = useCallback((text, callback) => {
+    let currentText = "";
+    let charIndex = 0;
+
+    const type = () => {
+      if (charIndex < text.length) {
+        currentText += text[charIndex];
+        setDisplayedText(currentText);
+        charIndex++;
+        setTimeout(type, 50);
+      } else if (callback) {
+        callback();
+      }
+    };
+
+    type();
   }, []);
 
-  // Handlers for opening and closing the Sign In modal
-  const handleSignIn = () => {
-    setShowSignInModal(true);
+  // Restart video when it ends
+  useEffect(() => {
+    const videoElement = videoRef.current;
+    
+    const handleVideoEnd = () => {
+      if (videoElement) {
+        videoElement.currentTime = 0;
+        videoElement.play();
+      }
+    };
+
+    if (videoElement) {
+      videoElement.addEventListener('ended', handleVideoEnd);
+      return () => {
+        videoElement.removeEventListener('ended', handleVideoEnd);
+      };
+    }
+  }, []);
+
+  // Typing effect on question change
+  useEffect(() => {
+    if (questions[currentQuestionIndex]) {
+      typeWriter(questions[currentQuestionIndex]);
+    }
+  }, [currentQuestionIndex, typeWriter]);
+
+  // Handle form submission logic (same as previous version)
+  const handleSubmit = () => {
+    const trimmedAnswer = answer.trim();
+    
+    if (!trimmedAnswer) return;
+
+    const newFormData = { ...formData };
+
+    switch (currentQuestionIndex) {
+      case 0:
+        newFormData.email = trimmedAnswer;
+        break;
+      case 1:
+        newFormData.name = trimmedAnswer;
+        break;
+      case 2:
+        newFormData.domain = trimmedAnswer;
+        break;
+      default:
+        break;
+    }
+
+    setFormData(newFormData);
+    setAnswer("");
+
+    if (currentQuestionIndex < 2) {
+      setCurrentQuestionIndex(prev => prev + 1);
+    }
   };
 
-  const closeSignInModal = () => {
-    setShowSignInModal(false);
+  const handleDomainSelect = (domain) => {
+    setFormData(prev => ({ ...prev, domain }));
+    handleSubmit();
   };
 
-  // Function to handle form submission (for Sign In)
-  const handleSignInSubmit = (e) => {
-    e.preventDefault();
-    console.log("Sign In form submitted");
+  const handleFinalSubmit = () => {
+    if (formData.domain) {
+      navigate("/socials", {
+        state: formData,
+        replace: true
+      });
+    }
+  };
+
+  // Render question content (same as previous version)
+  const renderQuestionContent = () => {
+    switch (currentQuestionIndex) {
+      case 0:
+      case 1:
+        return (
+          <motion.div
+            key="text-input"
+            initial={{ opacity: 0, y: 50 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -50 }}
+            transition={{ duration: 0.3 }}
+          >
+            <TextField
+              fullWidth
+              variant="outlined"
+              label={questions[currentQuestionIndex]}
+              value={answer}
+              onChange={(e) => setAnswer(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && handleSubmit()}
+              sx={{
+                '& .MuiInputBase-input': {
+                  color: 'white',
+                  fontSize: '1.2rem'
+                },
+                '& .MuiInputLabel-root': {
+                  color: 'rgba(255,255,255,0.7)'
+                },
+                '& .MuiOutlinedInput-root': {
+                  '& fieldset': {
+                    borderColor: 'rgba(255,255,255,0.3)'
+                  },
+                  '&:hover fieldset': {
+                    borderColor: 'white'
+                  },
+                  '&.Mui-focused fieldset': {
+                    borderColor: 'white'
+                  }
+                }
+              }}
+            />
+          </motion.div>
+        );
+      case 2:
+        return (
+          <motion.div
+            key="domain-selection"
+            initial={{ opacity: 0, y: 50 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -50 }}
+            transition={{ duration: 0.3 }}
+          >
+            <Box 
+              sx={{ 
+                display: 'flex', 
+                flexWrap: 'wrap', 
+                justifyContent: 'center', 
+                gap: 2 
+              }}
+            >
+              {domains.map((domain) => (
+                <motion.div
+                  key={domain}
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                >
+                  <Button
+                    variant={formData.domain === domain ? "contained" : "outlined"}
+                    color="primary"
+                    onClick={() => handleDomainSelect(domain)}
+                    sx={{
+                      borderRadius: 4,
+                      px: 3,
+                      py: 1.5,
+                      backgroundColor: formData.domain === domain 
+                        ? 'primary.main' 
+                        : 'transparent',
+                      color: formData.domain === domain 
+                        ? 'white' 
+                        : 'primary.light',
+                      borderColor: 'primary.light',
+                      transition: 'all 0.3s ease',
+                      '&:hover': {
+                        backgroundColor: 'primary.dark',
+                        color: 'white'
+                      }
+                    }}
+                  >
+                    {domain}
+                  </Button>
+                </motion.div>
+              ))}
+            </Box>
+          </motion.div>
+        );
+      default:
+        return null;
+    }
   };
 
   return (
-    <div style={styles.container}>
-      <video
-        src="/VED2.mp4" // Replace with your video URL
-        autoPlay
-        muted
-        loop
-        playsInline
-        controls={false}
-        style={styles.video}
-      />
-
-      {showOverlay && (
-        <div style={styles.overlay}>
-          <div style={styles.textContainer}>
-            <p style={styles.subtitle}>Let's dive in</p>
-            <div style={styles.buttonContainer}>
-              <button
-                style={
-                  isHoveringSignIn
-                    ? { ...styles.button, ...styles.buttonHover }
-                    : styles.button
-                }
-                onMouseEnter={() => setIsHoveringSignIn(true)}
-                onMouseLeave={() => setIsHoveringSignIn(false)}
-                onClick={handleSignIn}
-              >
-                Sign In
-              </button>
-              <button
-                style={
-                  isHoveringSignUp
-                    ? { ...styles.button, ...styles.buttonHover }
-                    : styles.button
-                }
-                onMouseEnter={() => setIsHoveringSignUp(true)}
-                onMouseLeave={() => setIsHoveringSignUp(false)}
-                onClick={() => navigate("/ques")}
-              >
-                Sign Up
-              </button>
-            </div>
-          </div>
-        </div>
+    <Box
+      sx={{
+        position: 'relative',
+        display: 'flex',
+        height: '100vh',
+        overflow: 'hidden'
+      }}
+    >
+      {/* Video Background */}
+      {!isMobile && (
+        <Box
+          sx={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            width: '100%',
+            height: '100%',
+            zIndex: -1,
+            '&::after': {
+              content: '""',
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              width: '100%',
+              height: '100%',
+              backgroundColor: 'rgba(0,0,0,0.6)', // Darkish overlay
+              zIndex: 1
+            }
+          }}
+        >
+          <video
+            ref={videoRef}
+            autoPlay
+            loop
+            muted
+            playsInline
+            style={{
+              width: '100%',
+              height: '100%',
+              objectFit: 'cover'
+            }}
+          >
+            <source src="/vid.mp4" type="video/mp4" />
+            Your browser does not support the video tag.
+          </video>
+        </Box>
       )}
 
-      {/* Enhanced Sign In Modal */}
-      {showSignInModal && (
-        <div style={styles.modalOverlay}>
-          <div style={styles.modalContent}>
-            <h2 style={styles.modalTitle}>Sign In</h2>
-            <form onSubmit={handleSignInSubmit}>
-              <input
-                type="email"
-                placeholder="Email"
-                required
-                style={styles.inputField}
-              />
-              <input
-                type="password"
-                placeholder="Password"
-                required
-                style={styles.inputField}
-              />
-              <button type="submit" style={styles.submitButton}>
-                Sign In
-              </button>
-              <button
-                type="button"
-                style={styles.closeButton}
-                onClick={closeSignInModal}
-              >
-                Close
-              </button>
-            </form>
-          </div>
-        </div>
-      )}
+      {/* Content Box */}
+      <Box
+        sx={{
+          position: 'relative',
+          zIndex: 2,
+          flex: 1,
+          display: 'flex',
+          flexDirection: 'column',
+          justifyContent: 'center',
+          alignItems: 'center',
+          p: 4,
+          backgroundColor: 'rgba(0,0,0,0.4)' // Additional background darkness
+        }}
+      >
+        <AnimatePresence mode="wait">
+          <motion.div
+            key={currentQuestionIndex}
+            initial={{ opacity: 0, y: 50 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -50 }}
+            transition={{ duration: 0.3 }}
+          >
+            <Typography 
+              variant="h3" 
+              sx={{ 
+                mb: 4, 
+                textAlign: 'center', 
+                fontWeight: 'bold',
+                color: 'white'
+              }}
+            >
+              {displayedText}
+            </Typography>
+          </motion.div>
+        </AnimatePresence>
 
-      <style>
-        {`
-          @keyframes fadeInOverlay {
-            0% {
-              opacity: 0;
-            }
-            100% {
-              opacity: 1;
-            }
-          }
+        <Box sx={{ width: '100%', maxWidth: 500 }}>
+          <AnimatePresence mode="wait">
+            {renderQuestionContent()}
+          </AnimatePresence>
+        </Box>
 
-          @keyframes fadeInScale {
-            0% {
-              opacity: 0;
-              transform: scale(0.9);
-            }
-            50% {
-              opacity: 1;
-              transform: scale(1.05);
-            }
-            100% {
-              opacity: 1;
-              transform: scale(1);
-            }
-          }
-
-          @keyframes slideUp {
-            from {
-              opacity: 0;
-              transform: translateY(50px);
-            }
-            to {
-              opacity: 1;
-              transform: translateY(0);
-            }
-          }
-        `}
-      </style>
-    </div>
+        {currentQuestionIndex === 2 && formData.domain && (
+          <motion.div
+            initial={{ opacity: 0, y: 50 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.3, duration: 0.3 }}
+          >
+            <Button
+              variant="contained"
+              color="primary"
+              onClick={handleFinalSubmit}
+              sx={{
+                mt: 3,
+                px: 4,
+                py: 1.5,
+                borderRadius: 4,
+                fontSize: '1.1rem'
+              }}
+            >
+              Continue
+            </Button>
+          </motion.div>
+        )}
+      </Box>
+    </Box>
   );
 };
 
-const styles = {
-  container: {
-    position: "relative",
-    height: "100vh",
-    width: "100vw",
-    backgroundColor: "#000",
-    overflow: "hidden",
-  },
-  video: {
-    position: "absolute",
-    top: 0,
-    left: 0,
-    width: "100%",
-    height: "100%",
-    objectFit: "cover",
-    pointerEvents: "none",
-  },
-  overlay: {
-    position: "absolute",
-    top: 0,
-    left: 0,
-    width: "100%",
-    height: "100%",
-    backgroundColor: "rgba(0, 0, 0, 0.5)",
-    display: "flex",
-    justifyContent: "center",
-    alignItems: "center",
-    animation: "fadeInOverlay 2s ease-in-out",
-  },
-  textContainer: {
-    display: "flex",
-    flexDirection: "column",
-    alignItems: "center",
-    animation: "fadeInScale 2s ease-in-out",
-  },
-  subtitle: {
-    fontSize: "28px",
-    color: "#fff",
-    marginBottom: "30px",
-    fontWeight: "400",
-    letterSpacing: "1px",
-    textAlign: "center",
-  },
-  buttonContainer: {
-    display: "flex",
-    gap: "20px",
-  },
-  button: {
-    backgroundColor: "transparent",
-    color: "#fff",
-    padding: "10px 20px",
-    fontSize: "16px",
-    border: "1px solid #fff",
-    borderRadius: "25px",
-    cursor: "pointer",
-    transition: "background-color 0.3s ease, transform 0.3s ease",
-  },
-  buttonHover: {
-    backgroundColor: "#fff",
-    color: "#000",
-    transform: "scale(1.05)",
-  },
-  modalOverlay: {
-    position: "fixed",
-    top: 0,
-    left: 0,
-    width: "100vw",
-    height: "100vh",
-    backgroundColor: "rgba(0, 0, 0, 0.8)", // More transparent for a smooth effect
-    display: "flex",
-    justifyContent: "center",
-    alignItems: "center",
-    animation: "fadeInOverlay 0.5s ease-in-out",
-  },
-  modalContent: {
-    backgroundColor: "rgba(255, 255, 255, 0.95)", // Slight transparency
-    padding: "40px",
-    borderRadius: "15px", // Softer border-radius
-    boxShadow: "0px 8px 30px rgba(0, 0, 0, 0.2)", // Stronger shadow for depth
-    animation: "slideUp 0.5s ease-in-out", // Slide-up effect for opening
-    textAlign: "center",
-    width: "400px",
-  },
-  modalTitle: {
-    fontSize: "24px",
-    marginBottom: "20px",
-    color: "#333",
-    animation: "fadeInOverlay 0.5s ease-in-out", // Smooth title fade-in
-  },
-  inputField: {
-    width: "100%",
-    padding: "12px",
-    margin: "12px 0",
-    borderRadius: "8px", // Softer corners for input
-    border: "1px solid #ccc",
-    fontSize: "16px",
-  },
-  submitButton: {
-    width: "100%",
-    padding: "12px",
-    backgroundColor: "#ff4757",
-    color: "#fff",
-    border: "none",
-    borderRadius: "8px",
-    cursor: "pointer",
-    marginBottom: "10px",
-    transition: "background-color 0.3s ease",
-  },
-  closeButton: {
-    width: "100%",
-    padding: "12px",
-    backgroundColor: "#ccc",
-    color: "#333",
-    border: "none",
-    borderRadius: "8px",
-    cursor: "pointer",
-  },
-};
-
-export default Int;
+export default Ques;
